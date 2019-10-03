@@ -1,13 +1,13 @@
-import json
+import time
 
 import req
 
 
 def pool_status(pool_id):
     r = req.get(f'/api/v1/pools/{pool_id}')
-    s = json.loads(r.text).get('status')
+    s = r.json().get('status')
     if not s:
-        return json.loads(r.text)
+        return r.json()
     return s
 
 
@@ -17,11 +17,15 @@ def set_pool_status(pool_id, change):
     if change == 0:
         s = 'close'
     r = req.post(f'/api/v1/pools/{pool_id}/{s}', obj=None)
-    return json.loads(r.text)
+    return r.json()
 
 
-def get_pool_assignments(pool_id):
-    return json.loads(req.get(f'/api/v1/assignments?pool_id={pool_id}').text)
+def get_pool_assignments(pool_id, status, start_ts=None):
+    if start_ts:
+        s = '&created_gt=2019-10-03T08:55:19'
+    else:
+        s = ''
+    return req.get(f'/api/v1/assignments?pool_id={pool_id}&status={status}{s}').json()
 
 
 def clone_pool(pool_id):
@@ -29,8 +33,8 @@ def clone_pool(pool_id):
         f'/api/v1/pools/{pool_id}/clone',
         None
     )
-    op = json.loads(r.text)['id']
+    op = r.json()['id']
     r = req.get(
         f'/api/v1/operations/{op}'
     )
-    return int(json.loads(r.text)['details']['pool_id'])
+    return int(r.json()['details']['pool_id'])

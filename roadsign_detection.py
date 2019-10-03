@@ -5,29 +5,24 @@ import time
 from collections import defaultdict
 
 import req
-from pool import pool_status, set_pool_status, get_pool_assignments, clone_pool
+from pool import pool_status, set_pool_status, get_pool_assignments
 from common import get_balance, send_tasks, send_acception
 
 
-def get_prepared_selections(pool, start_ts=None):
-    data = get_pool_assignments(pool)
+def get_prepared_selections(src_pool, dst_pool, start_ts=None):
+    data = get_pool_assignments(src_pool, status='SUBMITTED', start_ts=start_ts)
     res = list()
     mapping = {}
-
     for page in data['items']:
-        if not page['status'] == 'SUBMITTED':
-            continue
-        ts = page['submitted']
-        if start_ts and ts > start_ts:
-            continue
         for task, boxes in zip(page['tasks'], page['solutions']):
             val = {
                 'id': task['id'],
                 'input_values': task['input_values'],
-                'pool_id': second_pool,
+                'pool_id': dst_pool,
                 'overlap': 3,
             }
             val['input_values']['selection'] = boxes['output_values']['result']
+            val['input_values']['assignment_id'] = '2'
 
             mapping[task['input_values']['image']] = page['id']
             res.append(val)
@@ -35,16 +30,11 @@ def get_prepared_selections(pool, start_ts=None):
 
 
 def get_evaluations(start_ts=None):
-    data = get_pool_assignments(second_pool)
+    data = get_pool_assignments(evaluation_pool, status='ACCEPTED', start_ts=start_ts)
 
     res = list()
     mapping = {}
     for page in data['items']:
-        if not page['status'] == 'ACCEPTED':
-            continue
-        ts = page['submitted']
-        if start_ts and ts > start_ts:
-            continue
         for task, ans in zip(page['tasks'], page['solutions']):
             val = {
                 'image': task['input_values']['image'],
@@ -60,6 +50,7 @@ def get_decisions(data):
     for item in data:
         img_map[item['image']].append(item['ans'])
 
+    min_ok = 2
     decisions = dict()
     for img, answers in img_map.items():
         bads, manys, ins, outs = 0, 0, 0, 0
@@ -67,9 +58,9 @@ def get_decisions(data):
             bads += ans['ifbad'] == 'OK'
             manys += ans['ifmany'] == 'OK'
             ins += ans['ifin'] == 'OK'
-            outs += ans['ifout'] == 'OK'
-        decisions[img] = bads >= 2 and manys >= 2 and ins >= 2 and outs >= 2
-    return img_map
+            outs += ans['ifall'] == 'OK'
+        decisions[img] = bads >= min_ok and manys >= min_ok and ins >= min_ok and outs >= min_ok
+    return decisions
 
 
 def form_acceptions(decisions, mapping):
@@ -92,31 +83,30 @@ def form_new_tasks(img_list, new_pool):
             'input_values': {'image': img},
             'pool_id': new_pool,
             'overlap': 1
-        } for img in img_list
+        }
+        for img in img_list
     ]
 
 
 def confirm_pool_start(pool_id):
     print(f"Start pool {pool_id}? [y/n]")
     s = input()
-    if s.strip() != 'y':
-        return 0
-    return 1
+    return s.strip() == 'y'
 
 
-def first_assignment(image_list, base_pool, need_confirm=True):
-    new_pool = clone_pool(base_pool)
-    next_tasks = form_new_tasks(image_list, new_pool)
+def first_assignment(image_list, base_pool, evaluation_pool, need_confirm=True):
+    next_tasks = form_new_tasks(image_list, base_pool)
     send_tasks(next_tasks)
     start_ts = datetime.datetime.now().isoformat()
 
-    if not need_confirm or confirm_pool_start(new_pool):
-        set_pool_status(new_pool, 1)
-    while pool_status(new_pool) == 'OPEN':
+    if not need_confirm or confirm_pool_start(base_pool):
+        set_pool_status(base_pool, 1)
+    else:
+        raise KeyboardInterrupt
+    while pool_status(base_pool) == 'OPEN':
         time.sleep(10)
-
-    selections = get_prepared_selections(new_pool, start_ts)
-    return selections[0], selections[1], new_pool
+    selections = get_prepared_selections(base_pool, evaluation_pool, start_ts)
+    return selections[0], selections[1], base_pool
 
 
 def second_assignment(selections, evaluation_pool, need_confirm=True):
@@ -126,7 +116,6 @@ def second_assignment(selections, evaluation_pool, need_confirm=True):
         set_pool_status(evaluation_pool, 1)
     while pool_status(evaluation_pool) == 'OPEN':
         time.sleep(10)
-
     evaluations = get_evaluations(start_ts)
     decisions = get_decisions(evaluations)
     return decisions
@@ -141,12 +130,12 @@ def accept_and_reject(mapping, decisions):
 def pipeline(img_list, need_confirm=True):
     if get_balance() < 8:
         raise ZeroDivisionError  # :)
-    selections, mapping, new_pool = first_assignment(img_list, base_pool, need_confirm)
+    selections, img_page_mapping, new_pool = first_assignment(img_list, base_pool, evaluation_pool, need_confirm)
     decisions = second_assignment(selections, evaluation_pool, need_confirm)
-    accept_and_reject(mapping, decisions)
+    accept_and_reject(img_page_mapping, decisions)
     unmarked_img_list = [k for k, v in decisions.items() if not v]
     return unmarked_img_list
 
 
-base_pool = 7337247
+base_pool = 7383501
 evaluation_pool = 7330913

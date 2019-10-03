@@ -4,23 +4,36 @@ token = open("token").readline()
 
 
 def get(s):
-    return requests.get(
+    r = requests.get(
         f'https://toloka.yandex.ru/{s}',
         headers={"Authorization": f"OAuth {token}"}
     )
+    print(r)
+    if not r.ok:
+        print(r.json())
+    return r
+
 
 
 def post(post, obj):
-    return requests.post(
+    r = requests.post(
         f'https://toloka.yandex.ru/{post}',
         headers={"Authorization": f"OAuth {token}"},
         json=obj
     )
+    print(r)
+    if not r.ok:
+        print(r.json())
+    return r
 
 
 def patch(post, obj):
-    return requests.patch(
+    r = requests.patch(
         f'https://toloka.yandex.ru/{post}',
         headers={"Authorization": f"OAuth {token}"},
         json=obj
     )
+    print(r)
+    if not r.ok:
+        print(r.json())
+    return r

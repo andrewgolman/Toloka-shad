@@ -5,11 +5,11 @@ import req
 
 def get_balance():
     r = req.get('/api/v1/requester')
-    return json.loads(r.text)['balance']
+    return r.json()['balance']
 
 
 def send_tasks(selections):
-    return json.loads(req.post('/api/v1/tasks?allow_defaults=true', selections).text)
+    return req.post('/api/v1/tasks?allow_defaults=true', selections).json()
 
 
 json_acception = [
@@ -29,6 +29,5 @@ def send_acception(task_id, accept):
         json_acception[accept]
     )
     if not r.ok:
-        print(r.text)
-        raise RuntimeError(f"Can't send acception for id={task_id}")
+        raise RuntimeError(f"Can't send acception for id={task_id}: {r.text}")
     return r
