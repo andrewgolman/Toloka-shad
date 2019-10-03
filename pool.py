@@ -22,7 +22,7 @@ def set_pool_status(pool_id, change):
 
 def get_pool_assignments(pool_id, status, start_ts=None):
     if start_ts:
-        s = '&created_gt=2019-10-03T08:55:19'
+        s = f'&created_gt={start_ts}'
     else:
         s = ''
     return req.get(f'/api/v1/assignments?pool_id={pool_id}&status={status}{s}').json()

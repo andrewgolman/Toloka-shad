@@ -114,6 +114,7 @@ def second_assignment(selections, evaluation_pool, need_confirm=True):
     start_ts = datetime.datetime.now().isoformat()
     if not need_confirm or confirm_pool_start(evaluation_pool):
         set_pool_status(evaluation_pool, 1)
+    # todo isn't closed here automatically
     while pool_status(evaluation_pool) == 'OPEN':
         time.sleep(10)
     evaluations = get_evaluations(start_ts)
